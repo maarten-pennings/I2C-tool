@@ -509,7 +509,7 @@ void setup() {
   Serial.printf("HELP:\n");
   Serial.printf("- This device implements an I2C spy (echos all traffic to UART)\n");
   Serial.printf("- It also implements configurable clock stretch (can stretch any clock pulse)\n");
-  Serial.printf("- Finally it implements an I2C loopback service (write bytes, read them back)\n");
+  Serial.printf("- Finally it implements an I2C loop-back service (write bytes, read them back)\n");
   Serial.printf("- Hardware: SCL on pin %d, SDA on pin %d\n",scl_pin, sda_pin);
   Serial.printf("- Warning: cannot keep up with higher I2C clock, use 50kHz\n");
   Serial.printf("  On a 160MHz ESP8266, interrupt latency is ~4.3us. At 100kHz, interrupts come every 5us\n");
@@ -523,7 +523,7 @@ void setup() {
   Serial.printf("  QPULSE   r      06/07   Query: Number of CLK pulses in last transaction\n");
   Serial.printf("  QUS      r      08-11   Query: Number of us of the last transaction\n");
   Serial.printf("  RSVD     w/r    12-15   Reserved\n");
-  Serial.printf("  MSG      w/r    16-31   Buffer foor loopback message\n");
+  Serial.printf("  MSG      w/r    16-31   Buffer for loop-back message\n");
   Serial.printf("\n");
 
   pinMode(scl_pin, INPUT_PULLUP);
