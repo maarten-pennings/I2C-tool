@@ -1,5 +1,5 @@
 # I2C-tool
-ESP8266 firmware implementing an I2C slave with spy, loop-back and configurable clock stretch
+ESP8266 firmware implementing an I2C slave with spy, loop-back and configurable clock stretch injector.
 
 
 ## Introduction
@@ -149,9 +149,8 @@ reg: MSG= 55 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
 ```
 
 Let's now write 0x55 to the loop back-buffer (MSG at address 0x10). Three times.
-Notice that the first two take a bit longer `QUS=000003ae` and `QUS=000003a9` or about 940 us.
-The last one, and the one at the start of this section took `QUS=00000375` respectively `QUS=0000037c` or about 889 us.
-That is 51us longer.
+Notice that the first two take a bit longer due to the clock stretch injection.
+For the last one, ENABLE is back to 0, so there is no longer injection, so transaction time is back to normal.
 
 ```
 i2c: [s44a 00_010000/10a 55a p]
@@ -167,8 +166,13 @@ reg: CRA=11 ENABLE=0000 PULSE=000c US=0040 QPULSE=001c QUS=00000375 (32.20 kHz) 
 reg: MSG= 55 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
 ```
 
-Also note that the second byte on the serial output no longer just read `10a` but rather `00_010000/10a`.
-So, the byte sis expanded to 8 bits and the `_` shows which CLK valey is stretched.
+If we look in detail, the first two have `QUS=000003ae` and `QUS=000003a9` or a transaction time of about 940 us.
+The last one, and the one at the start of this section took `QUS=00000375` respectively `QUS=0000037c` or about 889 us.
+The difference is 51us. We injected 64 us, but a normal valey is about 15 us, so we expect 49 us extra
+which is close enough to 51 us we measured.
+
+Also note that the second byte on the serial output no longer just reads `10a` but rather `00_010000/10a`.
+So, the byte is expanded to 8 bits and the `_` shows which CLK valey is stretched.
 
 ![stretch](stretch.png)
 
