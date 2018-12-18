@@ -4,8 +4,8 @@
 
 // ===========================================================================================
 // We can delay() in an ISR, so we do busy spin.
-// The routine time_init() calibrates how many loop iterations are required to spin 
-// one milliseconds. It stores this in time_lpms.
+// The routine time_init() calibrates how many loop iterations are  
+// required to spin one milliseconds. It stores this in time_lpms.
 // The routine time_wait(us) does the actual wait.
 
 
@@ -464,6 +464,7 @@ void i2c_watchdog() {
 // Reset I2C interface and clear log
 void i2c_init() {
   i2c_reset();
+  // Somehow the following line ensures the first few interrupts are not missed (filling cache?)
   for( i2c.state=I2CSTATE_UNKNOWN; i2c.state<I2CSTATE_DATAACK_SCLHI; i2c.state++ ) { i2c_isr(); delay(1); }
   i2c_reset();
   while( log_get() ) /*skip*/ ;
@@ -521,9 +522,9 @@ void setup() {
   Serial.printf("  PULSE    w/r    02/03   The CLK pulse that is stretched (starts with 1)\n");
   Serial.printf("  US       w/r    04/05   Clock stretch time in us\n");
   Serial.printf("  QPULSE   r      06/07   Query: Number of CLK pulses in last transaction\n");
-  Serial.printf("  QUS      r      08-11   Query: Number of us of the last transaction\n");
-  Serial.printf("  RSVD     w/r    12-15   Reserved\n");
-  Serial.printf("  MSG      w/r    16-31   Buffer for loop-back message\n");
+  Serial.printf("  QUS      r      08-0B   Query: Number of us of the last transaction\n");
+  Serial.printf("  RSVD     w/r    0C-0F   Reserved\n");
+  Serial.printf("  MSG      w/r    10-1F   Buffer for loop-back message\n");
   Serial.printf("\n");
 
   pinMode(scl_pin, INPUT_PULLUP);
@@ -559,7 +560,8 @@ void loop() {
     Serial.printf("i2c: %s\n", buf_data);
   }
   
-  // Use hash to detrmine if registers are changed - if so, print them
+  // Use hash to determine if registers are changed - if so, print them.
+  // This reduces serial output in spy mode.
   static int last_hash= -1;
   int hash= slave_hash();
   if( last_hash!=hash ) {
