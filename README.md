@@ -43,9 +43,9 @@ i2c: [s86a 10a 00a p]
 i2c: [s86a 00a s87a 10a 02n p]
 ```
 
-The following example is a ping to device `88`. There is no such device on the bus, so there is no acknowledge.
-The final example is a ping to device `44`. 0x44 is the slave address of the device itself, so in this case the 
-deive is not only spy-ing, but also generating the acknowlegde `a`.
+The following example is a ping to device `88`. There is no such device on the bus, so there is no acknowledge (the `n`).
+The final example is a ping to device `44`. Note that 0x44 is the slave address of the device itself, so in this case the 
+device is not only spy-ing, but also generating the acknowlegde `a`.
 
 ```
 i2c: [s88n p]
@@ -61,10 +61,24 @@ a register called MSG. The MSG register is located at address 0x10 and is 16 byt
 i.e. it runs up to address 0x1F. Arbitrary bytes can be written to MSG, and they can be read back.
 The MSG data is retained as long as the device is not power-cycled or reset (or MSG is overwritten).
 
-The device itself has 0x44 (writing) or 0x45 (reading) as I2C slave address.
+Recall tjat the device itself has 0x44 (writing) or 0x45 (reading) as I2C slave address.
+
+The following example shows a write (of bytes 12, 34 and 56) to MSG (at address 10), followed by a read.
+Note that the Serial out not only shows the whole "spied" transaction, but also shows the content of 
+register MSG.
+
+```
+i2c: [s44a 10a 12a 34a 56a p]
+reg: MSG= 12 34 56 00 00 00 00 00 00 00 00 00 00 00 00 00
+
+i2c: [s44a 10a s45a 12a 34a 56n p]
+reg: MSG= 12 34 56 00 00 00 00 00 00 00 00 00 00 00 00 00
+```
 
 
 ## CLock stretch injector
+
+... to be described ...
 
 | REGISTER | ACCESS | MSB/LSB | DESCRIPTION                                     |
 |:--------:|:------:|:-------:|:-----------------------------------------------:|
