@@ -21,3 +21,10 @@ ESP8266 number 2 runs the `I2C-tool.ino` looping back messages send by ESP8266 n
 The goal is to test the ESP8266 I2C driver which comes with Arduino.
 It is completely written in software ("bit bang").
 
+
+## Wiring
+The actual wiring is as simple: connect the two ground pins GND (black),
+connect the two clock pins (SCL) D1 (green), and connect the two data (SDA) pins D2 (blue).
+
+![wiring](wiring.jpg)
+
