@@ -1,5 +1,8 @@
 // I2C-tool.ini - I2C slave device implementing spy, loopback and configurable clock stretch (ESP8266)
-#define VERSION 1
+// 20181219  v2  Maarten Pennings  Fixed bug in auto increment of read (two reads in one transaction)
+// 20181210  v1  Maarten Pennings  Initial version for GitHub
+
+#define VERSION 2
 
 
 // ===========================================================================================
@@ -357,6 +360,7 @@ void i2c_isr() {
               slave_cra++;
             }
           } else if( i2c.addr==SLAVE_ADDR+1 ) { 
+            // Release a (potential) pull down for the "previous" data bit
             SDA_HIGH();
           }
           if( i2c.logbits ) log_char('/');
@@ -381,15 +385,17 @@ void i2c_isr() {
       if( scl==0 ) {
         // SCL went low, so we have a complete data ack bit
         i2c.pulse++; 
-        if( i2c.addr==SLAVE_ADDR ) {
-          SDA_HIGH(); // Release ACK of DATA
-        } else if( i2c.sdacap ) {
-          SDA_HIGH(); // Release ACK of DATA, and do not push out data bit
-        } else if( i2c.addr==SLAVE_ADDR+1 ) { // We need to release ACK of DATA, but also push out the first data bit of the next byte
-          slave_cra++;
-          uint8_t val= (0<=slave_cra && slave_cra<SLAVE_REGCOUNT) ? slave_regs[slave_cra] : 0x55;
-          int mask= 1<<7;
-          if( val&mask ) SDA_HIGH(); else SDA_LOW();
+        if( i2c.addr==SLAVE_ADDR ) { // Master is writing to us, we just acked the received data byte
+          SDA_HIGH(); // Release ACK of DATA 
+        } else if( i2c.addr==SLAVE_ADDR+1 ) { // Master is reading from us, the master flagged with the ack if more data bytes are needed
+          slave_cra++; // One complete byte read, move to next
+          if( i2c.sdacap ) { // Master set ack bit to 1 (nack), no more bytes needed
+            SDA_HIGH(); // Release ACK of DATA (and do not push out first bit of next data byte)
+          } else if( i2c.addr==SLAVE_ADDR+1 ) { // We need to release ACK of DATA, but also push out the first data bit of the next byte
+            uint8_t val= (0<=slave_cra && slave_cra<SLAVE_REGCOUNT) ? slave_regs[slave_cra] : 0x55;
+            int mask= 1<<7;
+            if( val&mask ) SDA_HIGH(); else SDA_LOW();
+          }          
         }
         if( i2c.sdacap ) log_char('n'); else log_char('a');
         log_char(' '); // Space after data byte
