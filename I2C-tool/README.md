@@ -1,6 +1,8 @@
 # I2C-tool
 ESP8266 firmware implementing an I2C slave with spy, loop-back and configurable clock stretch injector.
 
+This tool is used in the [loop-back test for ESP8266](../I2Ctest8266), but it is is written as a standalone tool.
+
 
 ## Introduction
 This I2C-tool is an ESP8266 project implementing an I2C slave with the following features
