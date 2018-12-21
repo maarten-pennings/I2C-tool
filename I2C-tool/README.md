@@ -20,7 +20,7 @@ As a result it is recommended to use an I2C clock of e.g. 32kHz.
 The I2C-tool can be added to an I2C bus, and any transaction it sees is echoed over serial.
 This is the spy feature.
 
-![spy](spy.png)
+![spy](../pics/spy.png)
 
 Find below an example where some master sends a ping to device.
 This consists of a START condition `s`, the `86` slave address and a STOP `p`. 
@@ -68,7 +68,7 @@ a register called MSG. The MSG register is located at address 0x10 and is 16 byt
 i.e. it runs up to address 0x1F. Arbitrary bytes can be written to MSG, and they can be read back.
 The MSG data is retained as long as the device is not power-cycled or reset (or MSG is overwritten).
 
-![loop-back](loop-back.png)
+![loop-back](../pics/loop-back.png)
 
 The I2C-tool itself has 0x44 (writing) or 0x45 (reading) as I2C slave address.
 
@@ -123,7 +123,7 @@ leading to an estimated CLK frequency of 31.95 kHz.
 
 A seperate logic analyser shows ~900ms, 32.26 kHz and the 3 time 9 pulses.
 
-![timing](timing.png)
+![timing](../pics/timing.png)
 
 As an example, we will now configure the I2C-tool to stretch CLK valey number 12 for 64 us.
 We let the master send two commands to the I2C-tool: first we set register PULSE to 0x0c,
@@ -182,7 +182,7 @@ So, in the serial output, the byte is expanded to 8 bits and the `_` shows which
 
 This is ocnfirmed with a logic analyser.
 
-![stretch](stretch.png)
+![stretch](../pics/stretch.png)
 
 We still get acks, and a STOP condition, so the transaction completed successfully: the master could handle this clock stretch.
 

@@ -14,7 +14,7 @@ It uses the I2C-tool for loopback.
 ## Test setup
 The two sketches each run on an ESP8266 using the following setup.
 
-![testsetup](testsetup.png)
+![testsetup](pics/testsetup.png)
 
 Sketch `I2Ctest8266.ino` runs on ESP8266 number 1, mastering I2C transactions to ESP8266 number 2.
 ESP8266 number 2 runs the `I2C-tool.ino` looping back messages send by ESP8266 number 1.
@@ -28,7 +28,7 @@ the I2C driver is completely written in software (a so-called "bit bang" driver)
 The actual wiring is simple: connect the two ground pins GND (black),
 connect the two clock pins (SCL) D1 (green), and connect the two data (SDA) pins D2 (blue).
 
-![wiring](wiring.jpg)
+![wiring](pics/wiring.jpg)
 
 Wire both ESP8266's with USB to a PC. Load one with I2C-tool, flash it, run it, 
 and monitor the serial output, it shows the loop-back traffic. Load the other with the I2Ctest8266, 
