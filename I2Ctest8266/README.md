@@ -83,3 +83,47 @@ The function `clock_stretch_inject()` configures the I2C-tool to inject clock st
 and the functun `run1()` performs the 65 double loop-backs with walking clock stretch.
 
 
+## Results simple test case (run1/loopback1)
+Note that I run these tests on 2.4.2 (see Tools|Boards|Board manager|esp8266 (or 
+`C:\Users\mpen\AppData\Local\Arduino15\packages\esp8266\hardware\esp8266\2.4.2\cores\esp8266\core_version.h`).
+
+When we execute `run1()` we get as serial output (abbridged):
+```
+Starting ESP8266 (clock stretch) test
+Assumption: I2C-tool is hooked to I2C bus
+
+Test run 1 (write and writeread) with injected clock stretch
+Case 1 PASS
+Case 2 PASS
+Case 3 PASS
+...
+Case 16 PASS
+Case 17 PASS
+Case 18 PASS
+  loopback1 19: FAILED (byte 0 written 0x00 read 0xff)
+  loopback1 19: FAILED (byte 2 written 0x55 read 0xff)
+  loopback1 19: FAILED (byte 3 written 0x13 read 0xff)
+  loopback1 19: FAILED (byte 1 written 0x00 read 0xff)
+  loopback1 19: FAILED (byte 2 written 0xaa read 0xff)
+  loopback1 19: FAILED (byte 3 written 0x13 read 0xff)
+Case 19 FAIL
+Case 20 PASS
+Case 21 PASS
+...
+Case 77 PASS
+Case 78 PASS
+Case 79 PASS
+```
+
+We see that case 19 fails.
+When we run with and without clock stretch we see the difference on the logic analyser.
+The problem is that the clock stretch somehow masks the repeated start, so that a read turns into a write!
+
+![stretch](../pics/stretch-19.png)
+
+![nostretch](../pics/nostretch-19.png)
+
+We can switch to 2.5.0-beta2. It includes a suggested fix from me.
+An that indeed solves solves this problem. However, read below...
+
+![stretch beta fix](../pics/stretch-19-beta.png).
