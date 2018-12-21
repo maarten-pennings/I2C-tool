@@ -32,22 +32,54 @@ But I already knew that the ESP8266 does support clock stretching (e.g. iAQcore)
 but also that it did not support this in all cases (fix I did for CCS811).
 So apparently, clock stretching is sometines accepted by the ESP driver and sometimes not.
 
-My hypothesis was: clock stretching is accepted in some _positions_ in a transaction and not at other positions.
-I could image that a stretch would be ok after an sending a register address to be read, 
-but maybe not in the middle of receiving and register value.
+My hypothesis was: clock stretching is accepted in some _positions_ within a transaction and not at other positions.
+I could image that a stretch would be ok right after sending a complete register address (after bit 8), 
+but maybe not in the middle of sending a register value (between bit 3 and 4).
 
-I decided to write a tool that can clock stretch any arbitrary clock pulse in an I2C transaction.
-You find that tool as a companion to this sketch: [I2C-tool](../I2C-tool). That tool 
-is actually an I2C slave that can be configured to do a clock strecth of x us at 
-clock pulse y for the coming z transactions. The tool also has a loop-back feature: 
-you can write bytes to it, and read them back.
+I decided to write a tool that could stretch any clock pulse in an I2C transaction.
+You find that tool as a companion to this sketch: [I2C-tool](../I2C-tool). 
+That tool is actually an I2C slave that can be configured to do a clock stretch of 
+x us at clock pulse number y for the coming z transactions. 
+The tool also has a loop-back feature: you can write bytes to it, and read them back.
 
-This sketch is a test program.
-It assumes that an ESP8266 ...
+This sketch is the actual test program.
+It assumes that an ESP8266 (number 1) runs it, using the standard I2C bit bang driver.
+It assumes this first ESP8266 is connected to a second ESP8266, which runs the I2C-tool.
+
+![testsetup](../pics/testsetup.png)
 
 
+## Simple test case (run1/loopback1)
+I started with a simple test case. It uses the function `loopback1()`. 
+This function writes 4 bytes to the loopback device (the MSG register), and reads them back.
 
+Basically, it sends these two transactions
 
+```
+s44a 10a      00a FFa 55a 02a p
+s44a 10a s45a 00a FFa 55a 02n p
+```
 
+Note that they payload bytes are chosen all 0 bits (0x00), all 1 bits (0xFF) and mixed (0x55 or 0b01010101).
+The last byte is a `tag` byte, in practice the test case number.
+
+Since the MSG register is persistent, a missing bit in writing will go unnoticed.
+So I decided to do a dual write/read cycle, the second time with most data bits flipped.
+
+```
+s44a 10a      00a FFa 55a 02a p
+s44a 10a s45a 00a FFa 55a 02n p
+s44a 10a      FFa 00a AAa 02a p
+s44a 10a s45a FFa 00a AAa 02n p
+```
+
+The write transaction contain 55 clock pulses (valeys) and the read transactions 65.
+A test run executes the double loop-back (the above 4 transactions) 65 times, 
+each time stretching another clock pulse. In the last 10 double loop-backs (from 56 to 65), 
+the stretch does not occur for the writes, since they only have 55 pulses. But the reads
+are impacted.
+
+The function `clock_stretch_inject()` configures the I2C-tool to inject clock stretches,
+and the functun `run1()` performs the 65 double loop-backs with walking clock stretch.
 
 
