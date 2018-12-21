@@ -60,7 +60,7 @@ s44a 10a      00a FFa 55a 02a p
 s44a 10a s45a 00a FFa 55a 02n p
 ```
 
-Note that they payload bytes are chosen all 0 bits (0x00), all 1 bits (0xFF) and mixed (0x55 or 0b01010101).
+Note that the payload bytes are chosen all 0 bits (0x00), all 1 bits (0xFF) and mixed (0x55 or 0b01010101).
 The last byte is a `tag` byte, in practice the test case number.
 
 Since the MSG register is persistent, a missing bit in writing will go unnoticed.
@@ -123,7 +123,122 @@ The problem is that the clock stretch somehow masks the repeated start, so that 
 
 ![nostretch](../pics/nostretch-19.png)
 
-We can switch to 2.5.0-beta2. It includes a suggested fix from me.
+We can switch to 2.5.0-beta2. It includes a suggested fix [5340](https://github.com/esp8266/Arduino/issues/5340) from me.
 An that indeed solves solves this problem. However, read below...
 
 ![stretch beta fix](../pics/stretch-19-beta.png).
+
+
+## Multi segment test case (run2/loopback2)
+I continued with a more complex test case: I wanted to create as many special clock pulses as possible.
+It wrote the function `loopback2()`. This function also writes and reads back 4 bytes.
+However, it uses two segments for writing and reading the data
+
+It sends these two transactions
+```
+s44a 10a      00a FFa s44a 12a 55a 4Fa  p
+s44a 10a s45a 00a FFa s45a     55a 4Fn  p
+```
+
+Note that the first line (the "write" of the loopback) is an I2C transaction of two segments
+- the first segment, a write (`s44`), writes register address (10) then the data bytes (00 and FF)
+- the second segment, a write (`s44`), writes the remaining two data bytes (55 4F).
+The second line is the read of the loopback. It consists of three segments.
+- the first segment, a write (`s44`), writes register address (10)
+- the second segment, a read (`s45`), reads the first two bytes (00 FF).
+- the third segment, a read (`s45`), reads the last two bytes (55 4F).
+
+Also here, the `loopback2()` actually does two times a loop-back to flip the bits.
+
+The functun `run2()` performs the 65 double loop-backs with walking clock stretch.
+
+Now horror strikes: all tests fail.
+
+Capturing one loop-back2 in the logic analyser shows the problem, the 9th clock pulse (for ack/nack)
+is missing when a read follows a read.
+
+![missing ack](missingack.png).
+
+I submitted an issue for that [5528](https://github.com/esp8266/Arduino/issues/5528).
+With a fix.
+
+
+## How to fix
+Clearly, the I2C implementation has some bugs around clock stretching.
+
+I am _no longer happy_ with my first fix in issue [5340](https://github.com/esp8266/Arduino/issues/5340).
+
+The code I added was clock stretch detection code in a while loop that, I now beleiev, 
+in itself is already an exception handler. The loop checks if SDA is low at the end of an "I2C segment". 
+If SDA is low, the SCL is pulsed up to 10 times. This looks like the bus clear in the I2C 
+spec [um10204](https://www.nxp.com/docs/en/user-guide/UM10204.pdf).
+
+I now believe the read problem is actually earlier: namely the behavior between two segements, 
+i.e. just before the repeated start.
+
+My new suggested fix is to add a function
+```
+// Generate a clock "valey" (at the end of a segment, just before a repeated start)
+void twi_scl_valey( void ) {
+  SCL_LOW();
+  twi_delay(twi_dcount);
+  SCL_HIGH();
+  unsigned int t=0; while(SCL_READ()==0 && (t++)<twi_clockStretchLimit); // Clock stretching
+}
+```
+
+and then fix the two lines tagged `Maarten` in `twi_writeTo()`
+```
+unsigned char twi_writeTo(unsigned char address, unsigned char * buf, unsigned int len, unsigned char sendStop){
+  unsigned int i;
+  if(!twi_write_start()) return 4;//line busy
+  if(!twi_write_byte(((address << 1) | 0) & 0xFF)) {
+    if (sendStop) twi_write_stop();
+    return 2; //received NACK on transmit of address
+  }
+  for(i=0; i<len; i++) {
+    if(!twi_write_byte(buf[i])) {
+      if (sendStop) twi_write_stop();
+      return 3;//received NACK on transmit of data
+    }
+  }
+  if(sendStop) twi_write_stop();
+    else twi_scl_valey(); // Maarten
+  i = 0;
+  while(SDA_READ() == 0 && (i++) < 10){
+    SCL_LOW();
+    twi_delay(twi_dcount);
+    SCL_HIGH();
+    // Maarten unsigned int t=0; while(SCL_READ()==0 && (t++)<twi_clockStretchLimit); // twi_clockStretchLimit
+    twi_delay(twi_dcount);
+  }
+  return 0;
+}
+```
+
+and smilar for `twi_readFrom()`
+```
+unsigned char twi_readFrom(unsigned char address, unsigned char* buf, unsigned int len, unsigned char sendStop){
+  unsigned int i;
+  if(!twi_write_start()) return 4;//line busy
+  if(!twi_write_byte(((address << 1) | 1) & 0xFF)) {
+    if (sendStop) twi_write_stop();
+    return 2;//received NACK on transmit of address
+  }
+  for(i=0; i<(len-1); i++) buf[i] = twi_read_byte(false);
+  buf[len-1] = twi_read_byte(true);
+  if(sendStop) twi_write_stop();
+    else twi_scl_valey(); // Maarten
+  i = 0;
+  while(SDA_READ() == 0 && (i++) < 10){
+    SCL_LOW();
+    twi_delay(twi_dcount);
+    SCL_HIGH();
+    // Maarten unsigned int t=0; while(SCL_READ()==0 && (t++)<twi_clockStretchLimit); // twi_clockStretchLimit
+    twi_delay(twi_dcount);
+  }
+  return 0;
+}
+
+```
+
