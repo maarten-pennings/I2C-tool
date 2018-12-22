@@ -7,7 +7,7 @@ One of my projects uses an I2C slave device that performs clock stretching
 (it is the [CCS811](https://github.com/maarten-pennings/CCS811)).
 As I2C master I use an ESP8266. I have used the ESP8266 with other slaves 
 (e.g. [iAQ-Core](https://github.com/maarten-pennings/iAQcore)) 
-that require clock stretching, but somehow the ESP8266-CCS811 combo did not workreliably.
+that require clock stretching, but somehow the ESP8266-CCS811 combo did not work reliably.
 
 I had a look at the [I2C bit bang driver](https://github.com/esp8266/Arduino/blob/master/cores/esp8266/core_esp8266_si2c.c).
 In that driver, there are a couple of places with the statement `SCL_HIGH()`.
@@ -49,9 +49,9 @@ It assumes this first ESP8266 is connected to a second ESP8266, which runs the I
 ![testsetup](../pics/testsetup.png)
 
 
-## Simple test case (run1/loopback1)
+## The simple test case (run1/loopback1)
 I started with a simple test case. It uses the function `loopback1()`. 
-This function writes 4 bytes to the loopback device (the MSG register), and reads them back.
+This function writes 4 bytes to the loop-back device (the MSG register), and reads them back.
 
 Basically, it sends these two transactions
 
@@ -73,8 +73,8 @@ s44a 10a      FFa 00a AAa 02a p
 s44a 10a s45a FFa 00a AAa 02n p
 ```
 
-The write transaction contain 55 clock pulses (valeys) and the read transactions 65.
-A test run executes the double loop-back (the above 4 transactions) 65 times, 
+The write transaction contain 55 clock pulses (actually 55 clock valeys) and the read transactions 65.
+A test _run_ executes the "double loop-back" (the above 4 transactions) 65 times, 
 each time stretching another clock pulse. In the last 10 double loop-backs (from 56 to 65), 
 the stretch does not occur for the writes, since they only have 55 pulses. But the reads
 are impacted.
@@ -83,11 +83,11 @@ The function `clock_stretch_inject()` configures the I2C-tool to inject clock st
 and the functun `run1()` performs the 65 double loop-backs with walking clock stretch.
 
 
-## Results simple test case (run1/loopback1)
-Note that I run these tests on 2.4.2 (see Tools|Boards|Board manager|esp8266 (or 
-`C:\Users\mpen\AppData\Local\Arduino15\packages\esp8266\hardware\esp8266\2.4.2\cores\esp8266\core_version.h`).
+## Results of the simple test case (run1/loopback1)
+Note that I run these tests on ESP8266 core libraries version 2.4.2; see Tools|Boards|Board manager|esp8266 
+or see `C:\Users\mpen\AppData\Local\Arduino15\packages\esp8266\hardware\esp8266\2.4.2\cores\esp8266\core_version.h`.
 
-When we execute `run1()` we get as serial output (abbridged):
+When I execute `run1()` I get as serial output (abridged):
 ```
 Starting ESP8266 (clock stretch) test
 Assumption: I2C-tool is hooked to I2C bus
@@ -115,16 +115,15 @@ Case 78 PASS
 Case 79 PASS
 ```
 
-We see that case 19 fails.
-When we run with and without clock stretch we see the difference on the logic analyser.
+Case 19 fails. When I run with and without clock stretch we see the difference on the logic analyser.
 The problem is that the clock stretch somehow masks the repeated start, so that a read turns into a write!
 
 ![stretch](../pics/stretch-19.png)
 
 ![nostretch](../pics/nostretch-19.png)
 
-We can switch to 2.5.0-beta2. It includes a suggested fix [5340](https://github.com/esp8266/Arduino/issues/5340) from me.
-An that indeed solves solves this problem. However, read below...
+I switched to 2.5.0-beta2. It includes a suggested fix [5340](https://github.com/esp8266/Arduino/issues/5340) from me.
+An that indeed solves this problem. However, read below...
 
 ![stretch beta fix](../pics/stretch-19-beta.png).
 
@@ -132,7 +131,7 @@ An that indeed solves solves this problem. However, read below...
 ## Multi segment test case (run2/loopback2)
 I continued with a more complex test case: I wanted to create as many special clock pulses as possible.
 It wrote the function `loopback2()`. This function also writes and reads back 4 bytes.
-However, it uses two segments for writing and reading the data
+However, it uses _two_ segments for writing and _two_ for reading the data.
 
 It sends these two transactions
 ```
@@ -140,11 +139,11 @@ s44a 10a      00a FFa s44a 12a 55a 4Fa  p
 s44a 10a s45a 00a FFa s45a     55a 4Fn  p
 ```
 
-Note that the first line (the "write" of the loopback) is an I2C transaction of two segments
+Note that the first line (the "write" of the loop-back) is an I2C transaction consisting of two segments
 - the first segment, a write (`s44`), writes register address (10) then the data bytes (00 and FF)
-- the second segment, a write (`s44`), writes the remaining two data bytes (55 4F).
-The second line is the read of the loopback. It consists of three segments.
-- the first segment, a write (`s44`), writes register address (10)
+- the second segment, a write (`s44`), writes register address (12) and the remaining two data bytes (55 4F).
+The second line is the read of the loop-back. It consists of three segments.
+- the first segment, a write (`s44`), writes the register address (10)
 - the second segment, a read (`s45`), reads the first two bytes (00 FF).
 - the third segment, a read (`s45`), reads the last two bytes (55 4F).
 
@@ -157,10 +156,10 @@ Now horror strikes: all tests fail.
 Capturing one loop-back2 in the logic analyser shows the problem, the 9th clock pulse (for ack/nack)
 is missing when a read follows a read.
 
-![missing ack](missingack.png).
+![missing ack](../pics/missingack.png)
 
 I submitted an issue for that [5528](https://github.com/esp8266/Arduino/issues/5528).
-With a fix.
+With a fix. Hmm. We can do better than that one.
 
 
 ## How to fix
@@ -168,15 +167,15 @@ Clearly, the I2C implementation has some bugs around clock stretching.
 
 I am _no longer happy_ with my first fix in issue [5340](https://github.com/esp8266/Arduino/issues/5340).
 
-The code I added was clock stretch detection code in a while loop that, I now beleiev, 
-in itself is already an exception handler. The loop checks if SDA is low at the end of an "I2C segment". 
+The code I added was clock stretch detection code in a while loop. I now believe that the while loop
+itself is already an exception handler. The loop checks if SDA is low at the end of an I2C segment. 
 If SDA is low, the SCL is pulsed up to 10 times. This looks like the bus clear in the I2C 
 spec [um10204](https://www.nxp.com/docs/en/user-guide/UM10204.pdf).
 
-I now believe the read problem is actually earlier: namely the behavior between two segements, 
+I now believe the problem is actually earlier: namely the behavior between two segements, 
 i.e. just before the repeated start.
 
-My new suggested fix is to add a function
+My new suggested fix for both issues is to add a function
 ```
 // Generate a clock "valey" (at the end of a segment, just before a repeated start)
 void twi_scl_valey( void ) {
