@@ -1,14 +1,15 @@
 // I2C-tool.ini - I2C slave device implementing spy, loopback and configurable clock stretch (ESP8266)
+// 20190107  v3  Maarten Pennings  Put ISR in fast memory (IRAM) with ICACHE_FLASH_ATTR
 // 20181219  v2  Maarten Pennings  Fixed bug in auto increment of read (two reads in one transaction)
 // 20181210  v1  Maarten Pennings  Initial version for GitHub
 
-#define VERSION 2
+#define VERSION 3
 
 
 // ===========================================================================================
-// We can delay() in an ISR, so we do busy spin.
+// We can't delay() in an ISR, so we do busy spin.
 // The routine time_init() calibrates how many loop iterations are  
-// required to spin one milliseconds. It stores this in time_lpms.
+// required for one milliseconds. It stores this in time_lpms.
 // The routine time_wait(us) does the actual wait.
 
 
@@ -39,7 +40,7 @@ void time_init() {
 
 
 // Busy wait - needs the time_init() once to set up time_lpms
-void time_wait_us(int us) {
+void ICACHE_FLASH_ATTR time_wait_us(int us) {
   uint32_t count= time_lpms*us/1000;
   for( volatile uint32_t i=0; i<count; i++ ) /*skip*/ ;  
 }
@@ -112,7 +113,7 @@ int     log_tail=0;
 char    log_data[LOG_SIZE];
 
 
-void log_char(char ch) {
+void ICACHE_FLASH_ATTR log_char(char ch) {
   int newhead= (log_head+1) % LOG_SIZE;
   if( newhead==log_tail ) {
     // overflow
@@ -123,7 +124,7 @@ void log_char(char ch) {
 }
 
 
-void log_byte(int b) {
+void ICACHE_FLASH_ATTR log_byte(int b) {
   #define HX(n) ( (n)<10 ? (n)+'0' : (n)-10+'A' )
   log_char(HX(b/16));
   log_char(HX(b%16));
@@ -180,7 +181,7 @@ i2c_t i2c;
 
 
 // The ISR coupled to the two I2C pins
-void i2c_isr() {
+void ICACHE_FLASH_ATTR i2c_isr() {
   int scl= SCL_READ();
   int sda= SDA_READ();
 
@@ -418,7 +419,7 @@ void i2c_isr() {
 
 
 // Monitor the interrupt latency (SCL)
-void i2c_scl_isr() {
+void ICACHE_FLASH_ATTR i2c_scl_isr() {
   SCLMON_HIGH();
   i2c_isr();
   SCLMON_LOW();
@@ -426,7 +427,7 @@ void i2c_scl_isr() {
 
 
 // Monitor the interrupt latency (SDA)
-void i2c_sda_isr() {
+void ICACHE_FLASH_ATTR i2c_sda_isr() {
   SDAMON_HIGH();
   i2c_isr();
   SDAMON_LOW();
@@ -471,8 +472,8 @@ void i2c_watchdog() {
 void i2c_init() {
   i2c_reset();
   // Somehow the following line ensures the first few interrupts are not missed (filling cache?)
-  for( i2c.state=I2CSTATE_UNKNOWN; i2c.state<I2CSTATE_DATAACK_SCLHI; i2c.state++ ) { i2c_isr(); delay(1); }
-  i2c_reset();
+  // for( i2c.state=I2CSTATE_UNKNOWN; i2c.state<I2CSTATE_DATAACK_SCLHI; i2c.state++ ) { i2c_isr(); delay(1); }
+  // i2c_reset();
   while( log_get() ) /*skip*/ ;
 }
 
