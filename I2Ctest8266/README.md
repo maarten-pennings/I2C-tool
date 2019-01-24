@@ -175,7 +175,13 @@ spec [um10204](https://www.nxp.com/docs/en/user-guide/UM10204.pdf).
 I now believe the problem is actually earlier: namely the behavior between two segements, 
 i.e. just before the repeated start.
 
-My new suggested fix for both issues is to add a function
+My new suggested fix for both issues is to add a clock pulse before a repeated start. 
+We needto add a function for that and call it from two locations.
+You can do this yourself. Open the directory with core libaries (on my pc they are in 
+`C:\Users\mpen\AppData\Local\Arduino15\packages\esp8266\hardware\esp8266\2.4.2\cores\esp8266`) 
+and edit `core_esp8266_si2c.c`. 
+
+First we add a function
 ```
 // Generate a clock "valey" (at the end of a segment, just before a repeated start)
 void twi_scl_valey( void ) {
